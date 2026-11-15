@@ -15,59 +15,6 @@ namespace
         return cg;
     }
 
-    // Madera con vetas, nudos y bordes
-    void drawWood (Graphics& g, Rectangle<float> b, bool horizontal, Colour light, Colour dark, Random& r)
-    {
-        g.setGradientFill (horizontal
-            ? ColourGradient (light, 0.0f, b.getY(), dark, 0.0f, b.getBottom(), false)
-            : ColourGradient (light, b.getX(), 0.0f, dark, b.getRight(), 0.0f, false));
-        g.fillRect (b);
-
-        Graphics::ScopedSaveState ss (g);
-        g.reduceClipRegion (b.toNearestInt());
-
-        const int lines = (int) ((horizontal ? b.getHeight() : b.getWidth()) * 1.8f) + 4;
-        for (int i = 0; i < lines; ++i)
-        {
-            Path p;
-            if (horizontal)
-            {
-                const float y = b.getY() + r.nextFloat() * b.getHeight();
-                p.startNewSubPath (b.getX(), y + (r.nextFloat() - 0.5f) * 1.5f);
-                p.quadraticTo (b.getCentreX(), y + (r.nextFloat() - 0.5f) * 4.0f,
-                               b.getRight(), y + (r.nextFloat() - 0.5f) * 2.0f);
-            }
-            else
-            {
-                const float x = b.getX() + r.nextFloat() * b.getWidth();
-                p.startNewSubPath (x + (r.nextFloat() - 0.5f) * 1.5f, b.getY());
-                p.quadraticTo (x + (r.nextFloat() - 0.5f) * 4.0f, b.getCentreY(),
-                               x + (r.nextFloat() - 0.5f) * 2.0f, b.getBottom());
-            }
-            g.setColour ((r.nextFloat() < 0.75f ? Colours::black : Colours::white)
-                             .withAlpha (0.04f + r.nextFloat() * 0.10f));
-            g.strokePath (p, PathStrokeType (0.5f + r.nextFloat() * 0.7f));
-        }
-
-        if (r.nextFloat() < 0.45f)   // nudo
-        {
-            const float kx = b.getX() + b.getWidth() * (0.2f + 0.6f * r.nextFloat());
-            const float ky = b.getY() + b.getHeight() * (0.2f + 0.6f * r.nextFloat());
-            for (int k = 0; k < 4; ++k)
-            {
-                const float rr = 2.0f + k * 2.2f;
-                g.setColour (Colours::black.withAlpha (0.16f - k * 0.025f));
-                g.drawEllipse (kx - rr * 1.5f, ky - rr * 0.7f, rr * 3.0f, rr * 1.4f, 0.8f);
-            }
-        }
-
-        g.setColour (Colours::black.withAlpha (0.55f));
-        g.drawRect (b, 1.0f);
-        g.setColour (Colours::white.withAlpha (0.10f));
-        if (horizontal) g.drawLine (b.getX(), b.getY() + 1.0f, b.getRight(), b.getY() + 1.0f, 1.0f);
-        else            g.drawLine (b.getX() + 1.0f, b.getY(), b.getX() + 1.0f, b.getBottom(), 1.0f);
-    }
-
     void drawScrew (Graphics& g, float x, float y, float rad, float angle)
     {
         g.setGradientFill (ColourGradient (Colour (0xffe6e8ec), x - rad * 0.4f, y - rad * 0.4f,
@@ -82,15 +29,47 @@ namespace
         g.fillPath (slot, AffineTransform::rotation (angle).translated (x, y));
     }
 
-    void drawNail (Graphics& g, float x, float y)
+    // Panel acústico de espuma con pirámides (luz desde arriba a la izquierda)
+    void drawFoam (Graphics& g, Rectangle<float> area, int cols, int rows, Random& r)
     {
-        g.setColour (Colours::black.withAlpha (0.45f));
-        g.fillEllipse (x - 3.0f, y - 2.0f, 6.0f, 6.0f);
-        g.setGradientFill (ColourGradient (Colour (0xff6a6d73), x - 1.5f, y - 1.5f,
-                                           Colour (0xff1c1d20), x + 3.0f, y + 3.0f, true));
-        g.fillEllipse (x - 2.5f, y - 2.5f, 5.0f, 5.0f);
-        g.setColour (Colours::white.withAlpha (0.4f));
-        g.fillEllipse (x - 1.5f, y - 1.6f, 1.6f, 1.2f);
+        const float cw = area.getWidth() / (float) cols;
+        const float ch = area.getHeight() / (float) rows;
+
+        for (int row = 0; row < rows; ++row)
+        {
+            for (int col = 0; col < cols; ++col)
+            {
+                const float x = area.getX() + col * cw;
+                const float y = area.getY() + row * ch;
+                const float v = 1.0f + (r.nextFloat() - 0.5f) * 0.16f;
+
+                const Point<float> tl (x, y), tr (x + cw, y), bl (x, y + ch), br (x + cw, y + ch);
+                const Point<float> ce (x + cw * 0.5f, y + ch * 0.5f);
+
+                auto facet = [&] (Point<float> p1, Point<float> p2, Colour c)
+                {
+                    Path p;
+                    p.addTriangle (p1.x, p1.y, p2.x, p2.y, ce.x, ce.y);
+                    g.setColour (c.withMultipliedBrightness (v));
+                    g.fillPath (p);
+                };
+
+                facet (tl, tr, Colour (0xff5a5e65));   // cara superior (iluminada)
+                facet (tl, bl, Colour (0xff3c3f45));   // izquierda
+                facet (tr, br, Colour (0xff222427));   // derecha
+                facet (bl, br, Colour (0xff141516));   // inferior (sombra)
+
+                g.setColour (Colours::white.withAlpha (0.05f));
+                g.fillEllipse (ce.x - 1.6f, ce.y - 1.6f, 3.2f, 3.2f);
+            }
+        }
+
+        // juntas oscuras entre pirámides
+        g.setColour (Colours::black.withAlpha (0.60f));
+        for (int col = 0; col <= cols; ++col)
+            g.drawLine (area.getX() + col * cw, area.getY(), area.getX() + col * cw, area.getBottom(), 0.8f);
+        for (int row = 0; row <= rows; ++row)
+            g.drawLine (area.getX(), area.getY() + row * ch, area.getRight(), area.getY() + row * ch, 0.8f);
     }
 }
 
@@ -148,43 +127,36 @@ void LaPautaMicProAudioProcessorEditor::drawBackdrop (Graphics& g)
     const float fw = (float) W, fh = (float) H;
 
     // ---------- metal oscuro cepillado ----------
-    g.setGradientFill (ColourGradient (Colour (0xff72767d), 0.0f, 0.0f, Colour (0xff24272b), fw, fh, false));
+    g.setGradientFill (ColourGradient (Colour (0xff6a6e75), 0.0f, 0.0f, Colour (0xff202328), fw, fh, false));
     g.fillRect (0.0f, 0.0f, fw, fh);
 
     for (int i = 0; i < 2400; ++i)
     {
         const float x = r.nextFloat() * fw, y = r.nextFloat() * fh, len = 30.0f + r.nextFloat() * 220.0f;
-        g.setColour ((r.nextBool() ? Colours::white : Colours::black).withAlpha (r.nextFloat() * 0.06f));
+        g.setColour ((r.nextBool() ? Colours::white : Colours::black).withAlpha (r.nextFloat() * 0.055f));
         g.drawLine (x, y, x + len, y + (r.nextFloat() - 0.5f) * 0.5f, 0.5f);
     }
-    for (int i = 0; i < 1800; ++i)   // grano
+    for (int i = 0; i < 1600; ++i)   // grano fino
     {
-        g.setColour ((r.nextBool() ? Colours::white : Colours::black).withAlpha (0.04f + r.nextFloat() * 0.07f));
+        g.setColour ((r.nextBool() ? Colours::white : Colours::black).withAlpha (0.03f + r.nextFloat() * 0.06f));
         g.fillRect (r.nextFloat() * fw, r.nextFloat() * fh, 1.0f, 1.0f);
     }
 
-    // ---------- óxido ----------
+    // ---------- óxido sutil en los bordes ----------
     const Colour rust (0xffa4501f);
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 10; ++i)
     {
-        const bool edge = r.nextFloat() < 0.65f;
-        const float x = edge ? (r.nextBool() ? r.nextFloat() * 45.0f : fw - r.nextFloat() * 45.0f) : r.nextFloat() * fw;
+        const float x = r.nextBool() ? r.nextFloat() * 40.0f : fw - r.nextFloat() * 40.0f;
         const float y = r.nextFloat() * fh;
-        const float rad = 14.0f + r.nextFloat() * 42.0f;
-        g.setGradientFill (ColourGradient (rust.withAlpha (0.40f), x, y, rust.withAlpha (0.0f), x + rad, y, true));
+        const float rad = 14.0f + r.nextFloat() * 34.0f;
+        g.setGradientFill (ColourGradient (rust.withAlpha (0.30f), x, y, rust.withAlpha (0.0f), x + rad, y, true));
         g.fillEllipse (x - rad, y - rad, rad * 2.0f, rad * 2.0f);
     }
-    for (int i = 0; i < 12; ++i)     // chorreados
-    {
-        const float x = r.nextFloat() * fw, y0 = r.nextFloat() * fh * 0.4f, len = 20.0f + r.nextFloat() * 80.0f;
-        g.setColour (rust.withAlpha (0.06f + r.nextFloat() * 0.10f));
-        g.drawLine (x, y0, x + (r.nextFloat() - 0.5f) * 3.0f, y0 + len, 1.0f + r.nextFloat() * 1.6f);
-    }
-    for (int i = 0; i < 40; ++i)     // arañazos
+    for (int i = 0; i < 16; ++i)     // arañazos finos
     {
         const float x = r.nextFloat() * fw, y = r.nextFloat() * fh;
-        g.setColour (Colours::white.withAlpha (0.09f));
-        g.drawLine (x, y, x + (r.nextFloat() - 0.5f) * 34.0f, y + (r.nextFloat() - 0.5f) * 14.0f, 0.6f);
+        g.setColour (Colours::white.withAlpha (0.07f));
+        g.drawLine (x, y, x + (r.nextFloat() - 0.5f) * 30.0f, y + (r.nextFloat() - 0.5f) * 12.0f, 0.6f);
     }
 
     // ---------- placa del título ----------
@@ -211,60 +183,46 @@ void LaPautaMicProAudioProcessorEditor::drawBackdrop (Graphics& g)
     g.drawText ("MIC PRO", Rectangle<float> (plate.getX() + 12.0f, plate.getY() + 40.0f, plate.getWidth() - 20.0f, 20.0f),
                 Justification::centredLeft);
 
-    // ---------- caja de madera abierta ----------
-    const Rectangle<float> crate (150.0f, 16.0f, 276.0f, 238.0f);
-    const float post = 18.0f, rail = 22.0f;
+    // ---------- panel acústico ----------
+    const Rectangle<float> panel (150.0f, 16.0f, 276.0f, 238.0f);
+    const auto foam = panel.reduced (7.0f);
 
-    DropShadow (Colours::black.withAlpha (0.65f), 20, Point<int> (0, 9)).drawForRectangle (g, crate.toNearestInt());
+    Path panelPath;
+    panelPath.addRoundedRectangle (panel, 4.0f);
+    DropShadow (Colours::black.withAlpha (0.70f), 20, Point<int> (0, 9)).drawForPath (g, panelPath);
 
-    // pared del fondo (tablas horizontales)
-    Rectangle<float> inner (crate.getX() + post, crate.getY(), crate.getWidth() - post * 2.0f, crate.getHeight() - rail);
-    const int planks = 5;
-    for (int i = 0; i < planks; ++i)
-    {
-        Rectangle<float> pl (inner.getX(), inner.getY() + inner.getHeight() * i / planks,
-                             inner.getWidth(), inner.getHeight() / planks);
-        const float v = r.nextFloat() * 0.25f;
-        drawWood (g, pl, true, Colour (0xff6a4222).darker (v), Colour (0xff3d2412).darker (v), r);
-    }
+    // marco metálico negro
+    g.setGradientFill (ColourGradient (Colour (0xff43464c), 0.0f, panel.getY(),
+                                       Colour (0xff121315), 0.0f, panel.getBottom(), false));
+    g.fillPath (panelPath);
+    g.setColour (Colours::white.withAlpha (0.16f));
+    g.drawRoundedRectangle (panel, 4.0f, 1.0f);
 
-    // luz desde arriba (la caja está abierta) y sombras laterales
-    g.setGradientFill (ColourGradient (Colour (0xffffe2a8).withAlpha (0.20f), 0.0f, inner.getY(),
-                                       Colours::transparentBlack, 0.0f, inner.getY() + 110.0f, false));
-    g.fillRect (inner);
-    g.setGradientFill (ColourGradient (Colours::black.withAlpha (0.55f), inner.getX(), 0.0f,
-                                       Colours::transparentBlack, inner.getX() + 28.0f, 0.0f, false));
-    g.fillRect (inner);
-    g.setGradientFill (ColourGradient (Colours::black.withAlpha (0.55f), inner.getRight(), 0.0f,
-                                       Colours::transparentBlack, inner.getRight() - 28.0f, 0.0f, false));
-    g.fillRect (inner);
-    g.setGradientFill (ColourGradient (Colours::transparentBlack, 0.0f, inner.getBottom() - 50.0f,
-                                       Colours::black.withAlpha (0.50f), 0.0f, inner.getBottom(), false));
-    g.fillRect (inner);
+    // espuma con pirámides
+    drawFoam (g, foam, 12, 10, r);
 
-    // postes laterales y travesaño inferior
-    const Colour woodL (0xffb98245), woodD (0xff74491f);
-    drawWood (g, Rectangle<float> (crate.getX(), crate.getY(), post, crate.getHeight()), false, woodL, woodD, r);
-    drawWood (g, Rectangle<float> (crate.getRight() - post, crate.getY(), post, crate.getHeight()), false, woodL, woodD, r);
-    drawWood (g, Rectangle<float> (crate.getX(), crate.getBottom() - rail, crate.getWidth(), rail), true,
-              Colour (0xffc08948), Colour (0xff7b4c20), r);
+    // iluminación: luz desde arriba, bordes y base más oscuros
+    g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.12f), 0.0f, foam.getY(),
+                                       Colours::transparentBlack, 0.0f, foam.getY() + 110.0f, false));
+    g.fillRect (foam);
+    g.setGradientFill (ColourGradient (Colours::black.withAlpha (0.55f), foam.getX(), 0.0f,
+                                       Colours::transparentBlack, foam.getX() + 40.0f, 0.0f, false));
+    g.fillRect (foam);
+    g.setGradientFill (ColourGradient (Colours::black.withAlpha (0.55f), foam.getRight(), 0.0f,
+                                       Colours::transparentBlack, foam.getRight() - 40.0f, 0.0f, false));
+    g.fillRect (foam);
+    g.setGradientFill (ColourGradient (Colours::transparentBlack, 0.0f, foam.getBottom() - 60.0f,
+                                       Colours::black.withAlpha (0.55f), 0.0f, foam.getBottom(), false));
+    g.fillRect (foam);
 
-    g.setColour (Colour (0xffe0b074).withAlpha (0.85f));   // veta de testa arriba de los postes
-    g.fillRect (crate.getX(), crate.getY(), post, 3.0f);
-    g.fillRect (crate.getRight() - post, crate.getY(), post, 3.0f);
+    // borde interior hundido
+    g.setColour (Colours::black.withAlpha (0.85f));
+    g.drawRect (foam, 1.2f);
 
-    for (float ny : { crate.getY() + 26.0f, crate.getBottom() - rail - 24.0f })
-    {
-        drawNail (g, crate.getX() + post * 0.5f, ny);
-        drawNail (g, crate.getRight() - post * 0.5f, ny);
-    }
-    for (float nx : { crate.getX() + 30.0f, crate.getRight() - 30.0f })
-        drawNail (g, nx, crate.getBottom() - rail * 0.5f);
-
-    // luz cálida baja la zona del micrófono
-    g.setGradientFill (ColourGradient (Colour (0xffffc46b).withAlpha (0.16f), micX, 110.0f,
-                                       Colour (0xffffc46b).withAlpha (0.0f), micX + 120.0f, 110.0f, true));
-    g.fillRect (inner);
+    // tornillos del marco
+    for (float sx : { panel.getX() + 3.5f, panel.getRight() - 3.5f })
+        for (float sy : { panel.getY() + 3.5f, panel.getBottom() - 3.5f })
+            drawScrew (g, sx, sy, 2.2f, sx + sy);
 
     // ---------- tornillos, bisel y viñeta ----------
     drawScrew (g, 8.0f, 8.0f, 3.6f, 0.4f);
@@ -273,7 +231,7 @@ void LaPautaMicProAudioProcessorEditor::drawBackdrop (Graphics& g)
     drawScrew (g, fw - 8.0f, fh - 8.0f, 3.6f, 2.6f);
 
     g.setGradientFill (ColourGradient (Colours::transparentBlack, fw * 0.55f, fh * 0.45f,
-                                       Colours::black.withAlpha (0.50f), 0.0f, 0.0f, true));
+                                       Colours::black.withAlpha (0.45f), 0.0f, 0.0f, true));
     g.fillRect (0.0f, 0.0f, fw, fh);
 
     g.setColour (Colours::white.withAlpha (0.18f));
@@ -295,10 +253,6 @@ void LaPautaMicProAudioProcessorEditor::drawMic (Graphics& g)
         Rectangle<float> pole (cx + 54.0f, 176.0f, 10.0f, fh - 176.0f);
         g.setGradientFill (cylinder (pole, Colour (0xff0b0b0c), Colour (0xff26272a), Colour (0xff55585e)));
         g.fillRect (pole);
-        g.setColour (Colour (0xff17181a));
-        g.fillRoundedRectangle (cx + 50.0f, 190.0f, 18.0f, 14.0f, 3.0f);
-        g.setColour (Colours::white.withAlpha (0.12f));
-        g.drawRoundedRectangle (cx + 50.0f, 190.0f, 18.0f, 14.0f, 3.0f, 0.8f);
     }
 
     // ---- caja de alimentación con disipador ----
@@ -319,29 +273,47 @@ void LaPautaMicProAudioProcessorEditor::drawMic (Graphics& g)
         g.fillRect (box.getX(), box.getY(), 20.0f, box.getHeight());
         g.setColour (Colours::white.withAlpha (0.10f));
         g.drawRoundedRectangle (box, 3.0f, 0.8f);
-        g.setColour (Colour (0xff7e8289));                       // tornillitos
+        g.setColour (Colour (0xff7e8289));
         g.fillEllipse (box.getX() + 5.0f, box.getY() + 5.0f, 3.0f, 3.0f);
         g.fillEllipse (box.getX() + 5.0f, box.getBottom() - 8.0f, 3.0f, 3.0f);
     }
 
-    // ---- sombra del micrófono sobre la pared ----
+    // ---- brazo que une el micrófono con el soporte ----
     {
-        Path shadow;
-        shadow.addRoundedRectangle (cx - 30.0f + 9.0f, 34.0f + 6.0f, 60.0f, 172.0f, 22.0f);
-        DropShadow (Colours::black.withAlpha (0.55f), 12, Point<int> (0, 0)).drawForPath (g, shadow);
+        Rectangle<float> arm (cx + 24.0f, 182.0f, 34.0f, 11.0f);
+        g.setGradientFill (ColourGradient (Colour (0xff3a3c41), 0.0f, arm.getY(), Colour (0xff0e0e10), 0.0f, arm.getBottom(), false));
+        g.fillRoundedRectangle (arm, 3.0f);
+        g.setColour (Colours::white.withAlpha (0.14f));
+        g.drawRoundedRectangle (arm, 3.0f, 0.8f);
+        g.setGradientFill (ColourGradient (Colour (0xffe6e8ec), cx + 44.0f, 185.0f, Colour (0xff60636a), cx + 50.0f, 194.0f, true));
+        g.fillEllipse (cx + 41.0f, 183.5f, 8.0f, 8.0f);
     }
 
-    // ---- cuerpo ----
+    // ---- sombra del micrófono sobre el panel ----
     {
-        Rectangle<float> body (cx - 27.0f, 132.0f, 54.0f, 76.0f);
+        Path shadow;
+        shadow.addRoundedRectangle (cx - 30.0f + 9.0f, 34.0f + 6.0f, 60.0f, 182.0f, 22.0f);
+        DropShadow (Colours::black.withAlpha (0.60f), 13, Point<int> (0, 0)).drawForPath (g, shadow);
+    }
+
+    // ---- cuerpo (con el interruptor bien visible) ----
+    {
+        Rectangle<float> body (cx - 27.0f, 132.0f, 54.0f, 82.0f);
         g.setGradientFill (cylinder (body, Colour (0xff070708), Colour (0xff1c1d20), Colour (0xff45474c)));
         g.fillRect (body);
 
-        g.setColour (Colour (0xff3a3c41));                       // ranura del interruptor
-        g.fillRoundedRectangle (cx - 17.0f, 150.0f, 15.0f, 4.0f, 2.0f);
-        g.setColour (Colours::white.withAlpha (0.30f));
-        g.drawEllipse (cx - 21.0f, 148.0f, 5.0f, 5.0f, 0.8f);
-        g.drawEllipse (cx + 12.0f, 148.0f, 5.0f, 5.0f, 0.8f);
+        // interruptor deslizante
+        g.setColour (Colour (0xff0a0a0b));
+        g.fillRoundedRectangle (cx - 18.0f, 148.5f, 20.0f, 7.0f, 3.5f);
+        g.setColour (Colours::white.withAlpha (0.18f));
+        g.drawRoundedRectangle (cx - 18.0f, 148.5f, 20.0f, 7.0f, 3.5f, 0.7f);
+        g.setGradientFill (ColourGradient (Colour (0xffe9ebee), cx - 14.0f, 149.0f, Colour (0xff6f7279), cx - 8.0f, 156.0f, true));
+        g.fillEllipse (cx - 15.5f, 149.5f, 5.0f, 5.0f);
+
+        // marcas del interruptor
+        g.setColour (Colours::white.withAlpha (0.35f));
+        g.drawEllipse (cx - 23.0f, 149.0f, 4.5f, 4.5f, 0.8f);
+        g.drawEllipse (cx + 5.0f, 149.0f, 4.5f, 4.5f, 0.8f);
     }
 
     // ---- cabeza con rejilla ----
@@ -357,7 +329,6 @@ void LaPautaMicProAudioProcessorEditor::drawMic (Graphics& g)
         Graphics::ScopedSaveState ss (g);
         g.reduceClipRegion (hp);
 
-        // malla (dos diagonales cruzadas)
         for (float k = -head.getHeight(); k < head.getWidth() + head.getHeight(); k += 3.4f)
         {
             g.setColour (Colours::white.withAlpha (0.11f));
@@ -366,7 +337,6 @@ void LaPautaMicProAudioProcessorEditor::drawMic (Graphics& g)
             g.drawLine (head.getX() + k, head.getY(), head.getX() + k + head.getHeight(), head.getBottom(), 0.6f);
         }
 
-        // reflejo especular vertical y brillo de la cúpula
         g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.26f), 0.0f, head.getY() + 6.0f,
                                            Colours::white.withAlpha (0.0f), 0.0f, head.getBottom(), false));
         g.fillRoundedRectangle (head.getX() + 11.0f, head.getY() + 6.0f, 6.0f, head.getHeight() - 14.0f, 3.0f);
@@ -376,37 +346,13 @@ void LaPautaMicProAudioProcessorEditor::drawMic (Graphics& g)
     }
 
     // ---- anillos plateados ----
-    for (float ry : { 130.0f, 206.0f })
+    for (float ry : { 130.0f, 209.0f })
     {
         Rectangle<float> ring (cx - 29.0f, ry, 58.0f, 5.0f);
         g.setGradientFill (cylinder (ring, Colour (0xff595c62), Colour (0xff9da1a8), Colour (0xffe9ebee)));
         g.fillRoundedRectangle (ring, 1.5f);
         g.setColour (Colours::black.withAlpha (0.5f));
         g.drawRoundedRectangle (ring, 1.5f, 0.7f);
-    }
-
-    // ---- suspensión elástica ----
-    {
-        const float ringY = 188.0f;
-        g.setColour (Colour (0xff0a0a0b));
-        for (int i = 0; i < 9; ++i)
-        {
-            const float a = -1.0f + i * 0.25f;
-            g.drawLine (cx + a * 48.0f, ringY + std::abs (a) * 2.0f, cx + a * 30.0f, 164.0f, 1.3f);
-            g.drawLine (cx + a * 48.0f, ringY + std::abs (a) * 2.0f, cx + a * 30.0f, 214.0f, 1.3f);
-        }
-        g.setColour (Colours::white.withAlpha (0.07f));
-        for (int i = 0; i < 9; ++i)
-        {
-            const float a = -1.0f + i * 0.25f;
-            g.drawLine (cx + a * 48.0f + 0.8f, ringY + std::abs (a) * 2.0f, cx + a * 30.0f + 0.8f, 164.0f, 0.6f);
-        }
-
-        Rectangle<float> ring (cx - 52.0f, ringY - 10.0f, 104.0f, 28.0f);
-        g.setColour (Colour (0xff0d0d0f));
-        g.drawEllipse (ring, 8.0f);
-        g.setColour (Colours::white.withAlpha (0.16f));
-        g.drawEllipse (ring.reduced (1.5f), 1.0f);
     }
 
     // ---- conector XLR y cable ----
@@ -436,25 +382,25 @@ void LaPautaMicProAudioProcessorEditor::paint (Graphics& g)
 
     g.drawImage (backdrop, bounds);
 
-    // al encender, la caja se ilumina con luz cálida
+    // al encender, el panel se ilumina con una luz cálida detrás del micrófono
     if (glow > 0.01f)
     {
-        g.setGradientFill (ColourGradient (Colour (0xffffc46b).withAlpha (0.30f * glow), micX, 100.0f,
-                                           Colour (0xffffc46b).withAlpha (0.0f), micX + 140.0f, 100.0f, true));
-        g.fillRect (168.0f, 16.0f, 240.0f, 216.0f);
+        g.setGradientFill (ColourGradient (Colour (0xffffc46b).withAlpha (0.34f * glow), micX, 110.0f,
+                                           Colour (0xffffc46b).withAlpha (0.0f), micX + 140.0f, 110.0f, true));
+        g.fillRect (157.0f, 23.0f, 262.0f, 224.0f);
     }
 
     g.drawImage (micLayer, bounds);
 
-    // LED de encendido
+    // LED de encendido (debajo del interruptor del micrófono)
     if (glow > 0.01f)
     {
-        g.setGradientFill (ColourGradient (Colour (0xff5dff6b).withAlpha (0.85f * glow), micX, 160.0f,
-                                           Colour (0xff5dff6b).withAlpha (0.0f), micX + 11.0f, 160.0f, true));
-        g.fillEllipse (micX - 11.0f, 149.0f, 22.0f, 22.0f);
+        g.setGradientFill (ColourGradient (Colour (0xff5dff6b).withAlpha (0.85f * glow), micX, 176.0f,
+                                           Colour (0xff5dff6b).withAlpha (0.0f), micX + 11.0f, 176.0f, true));
+        g.fillEllipse (micX - 11.0f, 165.0f, 22.0f, 22.0f);
     }
     g.setColour (Colour (0xff3a1a1a).interpolatedWith (Colour (0xff8dff98), glow));
-    g.fillEllipse (micX - 3.0f, 157.0f, 6.0f, 6.0f);
+    g.fillEllipse (micX - 3.0f, 173.0f, 6.0f, 6.0f);
     g.setColour (Colours::white.withAlpha (0.35f * glow));
-    g.fillEllipse (micX - 1.8f, 157.8f, 2.2f, 1.6f);
+    g.fillEllipse (micX - 1.8f, 173.8f, 2.2f, 1.6f);
 }
