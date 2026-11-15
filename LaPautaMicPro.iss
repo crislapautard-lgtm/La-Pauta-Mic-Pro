@@ -6,6 +6,11 @@
 #define MyAppPublisher "La Pauta"
 #define VstBundle "La Pauta Mic Pro.vst3"
 
+; Carpeta de compilación; el workflow la pasa con /DBuildDir=ruta_absoluta
+#ifndef BuildDir
+  #define BuildDir "..\build"
+#endif
+
 [Setup]
 AppId={{B6E2A3F4-5C1D-4E8A-9A7B-3D2F1C0E9A41}
 AppName={#MyAppName}
@@ -30,7 +35,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Files]
 ; Copia el bundle .vst3 completo a la carpeta estándar de VST3 de Windows
-Source: "..\build\LaPautaMicPro_artefacts\Release\VST3\{#VstBundle}\*"; \
+Source: "{#BuildDir}\LaPautaMicPro_artefacts\Release\VST3\{#VstBundle}\*"; \
     DestDir: "{commoncf64}\VST3\{#VstBundle}"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
