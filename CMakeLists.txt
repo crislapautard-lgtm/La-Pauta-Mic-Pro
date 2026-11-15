@@ -18,6 +18,7 @@ FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(LaPautaMicPro
     COMPANY_NAME "La Pauta"
+    BUNDLE_ID com.lapauta.micpro
     PLUGIN_MANUFACTURER_CODE LaPa
     PLUGIN_CODE LpMp
     FORMATS VST3
@@ -27,9 +28,30 @@ juce_add_plugin(LaPautaMicPro
     NEEDS_MIDI_OUTPUT FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
-target_sources(LaPautaMicPro PRIVATE
-    PluginProcessor.cpp
-    PluginEditor.cpp)
+# Busca los archivos .cpp en la raíz del repo o en carpetas comunes (Source, src, plugin)
+set(PLUGIN_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    ${CMAKE_CURRENT_SOURCE_DIR}/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/plugin)
+
+set(PLUGIN_SOURCES "")
+set(PLUGIN_INCLUDE_DIRS "")
+foreach(dir ${PLUGIN_DIRS})
+    file(GLOB found "${dir}/PluginProcessor.cpp" "${dir}/PluginEditor.cpp")
+    if(found)
+        list(APPEND PLUGIN_SOURCES ${found})
+        list(APPEND PLUGIN_INCLUDE_DIRS ${dir})
+    endif()
+endforeach()
+
+if(NOT PLUGIN_SOURCES)
+    message(FATAL_ERROR "No se encontraron PluginProcessor.cpp / PluginEditor.cpp. Súbelos a la raíz del repo o a la carpeta Source/.")
+endif()
+
+target_sources(LaPautaMicPro PRIVATE ${PLUGIN_SOURCES})
+target_include_directories(LaPautaMicPro PRIVATE ${PLUGIN_INCLUDE_DIRS})
 
 target_compile_definitions(LaPautaMicPro PUBLIC
     JUCE_WEB_BROWSER=0
@@ -44,3 +66,4 @@ target_link_libraries(LaPautaMicPro
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+        
