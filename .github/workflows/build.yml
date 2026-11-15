@@ -22,14 +22,30 @@ jobs:
       - name: Crear instalador
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & $iscc "installer\LaPautaMicPro.iss"
+          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "${env:ProgramFiles}\Inno Setup 6\ISCC.exe") |
+              Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "No se encontró ISCC.exe" }
+
+          $iss = Get-ChildItem -Path . -Filter LaPautaMicPro.iss -Recurse |
+            Where-Object { $_.FullName -notmatch '\\build\\' } | Select-Object -First 1
+          if (-not $iss) { throw "No se encontró LaPautaMicPro.iss en el repo" }
+
+          Write-Host "ISCC: $iscc"
+          Write-Host "Script: $($iss.FullName)"
+          Get-ChildItem -Recurse build\LaPautaMicPro_artefacts\Release\VST3 | Select-Object -First 5 FullName
+
+          New-Item -ItemType Directory -Force -Path installer-out | Out-Null
+          & $iscc "/DBuildDir=$PWD\build" "/O$PWD\installer-out" $iss.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup falló con código $LASTEXITCODE" }
 
       - name: Subir instalador
         uses: actions/upload-artifact@v4
         with:
           name: La-Pauta-Mic-Pro-Instalador-Windows
-          path: installer/Output/La-Pauta-Mic-Pro-Setup.exe
+          path: installer-out/La-Pauta-Mic-Pro-Setup.exe
 
       - name: Subir VST3 (sin instalador)
         uses: actions/upload-artifact@v4
